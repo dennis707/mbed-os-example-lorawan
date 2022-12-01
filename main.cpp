@@ -14,7 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <stdio.h>
+#include <cstdint>
+#include <cstdio>
+
+#include "BUILD/DISCO_L072CZ_LRWAN1/ARMC6/mbed_config.h"
+#include "mbed_version.h"
 
 #include "lorawan/LoRaWANInterface.h"
 #include "lorawan/system/lorawan_data_structures.h"
@@ -26,6 +30,7 @@
 #include "lora_radio_helper.h"
 
 using namespace events;
+using namespace std::chrono_literals;
 
 // Max payload size can be LORAMAC_PHY_MAXPAYLOAD.
 // This example only communicates with much shorter messages (<30 bytes).
@@ -36,7 +41,7 @@ uint8_t rx_buffer[30];
 /*
  * Sets up an application dependent transmission timer in ms. Used only when Duty Cycling is off for testing
  */
-#define TX_TIMER                        10000
+#define TX_TIMER                        10s
 
 /**
  * Maximum number of events for the event queue.
@@ -88,10 +93,39 @@ static LoRaWANInterface lorawan(radio);
 static lorawan_app_callbacks_t callbacks;
 
 /**
+ * Default and configured device EUI
+ */
+static uint8_t DEFAULT_DEV_EUI[] = {0x40, 0x39, 0x32, 0x35, 0x59, 0x37, 0x91, 0x94};
+// The Mbed LoRaWAN API does not provide access to the connection
+// parameters, but we can use the mbed_config.h macro definitions
+// to know their values
+static uint8_t DEV_EUI[] = MBED_CONF_LORA_DEVICE_EUI;
+static uint8_t APP_EUI[] = MBED_CONF_LORA_APPLICATION_EUI;
+static uint8_t APP_KEY[] = MBED_CONF_LORA_APPLICATION_KEY;
+
+/**
  * Entry point for application
  */
 int main(void)
 {
+    printf("\r\n*** Sensor Networks @ ETSIST, UPM ***\r\n"
+           "   Mbed (v%d.%d.%d) LoRaWAN example\r\n",
+           MBED_MAJOR_VERSION, MBED_MINOR_VERSION, MBED_PATCH_VERSION);
+
+    printf("\r\n DEV_EUI: ");
+    for (int i = 0; i < sizeof(DEV_EUI); ++i) printf("%02x", DEV_EUI[i]);
+    printf("\r\n APP_EUI: ");
+    for (int i = 0; i < sizeof(APP_EUI); ++i) printf("%02x", APP_EUI[i]);
+    printf("\r\n APP_KEY: ");
+    for (int i = 0; i < sizeof(APP_KEY); ++i) printf("%02x", APP_KEY[i]);
+    printf("\r\n");
+
+    if (!memcmp(DEV_EUI, DEFAULT_DEV_EUI, sizeof(DEV_EUI))) {
+        printf("\r\n *** You are using the default device EUI value!!! *** \r\n");
+        printf("Please, change it to ensure that the device EUI is unique \r\n");
+        return -1;
+    }
+
     // setup tracing
     setup_trace();
 
@@ -130,6 +164,15 @@ int main(void)
 
     retcode = lorawan.connect();
 
+    // LoRa parameters can also be specified in the connect() call:
+    //lorawan_connect_t connect_params;
+    //connect_params.connect_type = LORAWAN_CONNECTION_OTAA;
+    //connect_params.connection_u.otaa.dev_eui = DEV_EUI;
+    //connect_params.connection_u.otaa.app_eui = APP_EUI;
+    //connect_params.connection_u.otaa.app_key = APP_KEY;
+    //connect_params.connection_u.otaa.nb_trials = 3;
+    //retcode = lorawan.connect(connect_params);
+
     if (retcode == LORAWAN_STATUS_OK ||
             retcode == LORAWAN_STATUS_CONNECT_IN_PROGRESS) {
     } else {
@@ -164,8 +207,8 @@ static void send_message()
         return;
     }
 
-    packet_len = sprintf((char *) tx_buffer, "Dummy Sensor Value is %d",
-                         sensor_value);
+    packet_len = snprintf((char *) tx_buffer, sizeof(tx_buffer),
+                          "Dummy Sensor Value is %d", sensor_value);
 
     retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packet_len,
                            MSG_UNCONFIRMED_FLAG);
