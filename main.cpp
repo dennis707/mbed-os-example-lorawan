@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "BUILD/DISCO_L072CZ_LRWAN1/ARMC6/mbed_config.h"
 #include "mbed_version.h"
 
 #include "lorawan/LoRaWANInterface.h"
@@ -93,15 +92,13 @@ static LoRaWANInterface lorawan(radio);
 static lorawan_app_callbacks_t callbacks;
 
 /**
- * Default and configured device EUI
+ * Default and configured device EUI, application EUI and application key
  */
-static uint8_t DEFAULT_DEV_EUI[] = {0x40, 0x39, 0x32, 0x35, 0x59, 0x37, 0x91, 0x94};
-// The Mbed LoRaWAN API does not provide access to the connection
-// parameters, but we can use the mbed_config.h macro definitions
-// to know their values
-static uint8_t DEV_EUI[] = MBED_CONF_LORA_DEVICE_EUI;
-static uint8_t APP_EUI[] = MBED_CONF_LORA_APPLICATION_EUI;
-static uint8_t APP_KEY[] = MBED_CONF_LORA_APPLICATION_KEY;
+static const uint8_t DEFAULT_DEV_EUI[] = {0x40, 0x39, 0x32, 0x35, 0x59, 0x37, 0x91, 0x94};
+static uint8_t DEV_EUI[] = {0x40, 0x39, 0x32, 0x35, 0x59, 0x37, 0x91, 0x94};
+static uint8_t APP_EUI[] = {0x70, 0xb3, 0xd5, 0x7e, 0xd0, 0x00, 0xfc, 0x4d};
+static uint8_t APP_KEY[] = {0xf3, 0x1c, 0x2e, 0x8b, 0xc6, 0x71, 0x28, 0x1d,
+                            0x51, 0x16, 0xf0, 0x8f, 0xf0, 0xb7, 0x92, 0x8f};
 
 /**
  * Entry point for application
@@ -162,16 +159,14 @@ int main(void)
 
     printf("\r\n Adaptive data  rate (ADR) - Enabled \r\n");
 
-    retcode = lorawan.connect();
+    lorawan_connect_t connect_params;
+    connect_params.connect_type = LORAWAN_CONNECTION_OTAA;
+    connect_params.connection_u.otaa.dev_eui = DEV_EUI;
+    connect_params.connection_u.otaa.app_eui = APP_EUI;
+    connect_params.connection_u.otaa.app_key = APP_KEY;
+    connect_params.connection_u.otaa.nb_trials = 3;
 
-    // LoRa parameters can also be specified in the connect() call:
-    //lorawan_connect_t connect_params;
-    //connect_params.connect_type = LORAWAN_CONNECTION_OTAA;
-    //connect_params.connection_u.otaa.dev_eui = DEV_EUI;
-    //connect_params.connection_u.otaa.app_eui = APP_EUI;
-    //connect_params.connection_u.otaa.app_key = APP_KEY;
-    //connect_params.connection_u.otaa.nb_trials = 3;
-    //retcode = lorawan.connect(connect_params);
+    retcode = lorawan.connect(connect_params);
 
     if (retcode == LORAWAN_STATUS_OK ||
             retcode == LORAWAN_STATUS_CONNECT_IN_PROGRESS) {
@@ -220,7 +215,7 @@ static void send_message()
         if (retcode == LORAWAN_STATUS_WOULD_BLOCK) {
             //retry in 3 seconds
             if (MBED_CONF_LORA_DUTY_CYCLE_ON) {
-                ev_queue.call_in(3000, send_message);
+                ev_queue.call_in(3s, send_message);
             }
         }
         return;
