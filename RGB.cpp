@@ -1,4 +1,4 @@
-#include "rgb.h"
+#include "RGB.h"
 
 // Pin definitions for RGB LED (common anode)
 DigitalOut red_led(D15);
